@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Solmar Bay — Sunset Run</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1b1030; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .panel { background: rgba(12, 10, 26, 0.78); border: 1px solid rgba(255, 215, 110, 0.35); border-radius: 10px; color: #f2ede4; box-shadow: 0 4px 18px rgba(0,0,0,0.45); }
+  #hud { position: fixed; inset: 0; pointer-events: none; font-size: 13px; }
+  /* ---- Top bar: three separate zones, nothing overlaps ---- */
+  #hud-top { position: absolute; top: 10px; left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  #hud-wanted { padding: 8px 12px; }
+  #hud-stars { font-size: 22px; letter-spacing: 3px; color: #ffd76e; line-height: 1; }
+  #hud-wanted-label { font-size: 10px; letter-spacing: 3px; color: #ff9a52; margin-top: 4px; }
+  #hud-mission { padding: 8px 16px; text-align: center; min-width: 380px; }
+  #hud-mission-name { font-size: 17px; font-weight: 900; letter-spacing: 1px; color: #ffd76e; }
+  #hud-mission-stage { font-size: 11px; color: #ff9a52; letter-spacing: 2px; margin-top: 1px; }
+  #hud-mission-obj { font-size: 13px; margin-top: 3px; }
+  #hud-mission-next { font-size: 11px; color: #b9b3c9; margin-top: 2px; }
+  #hud-cash { padding: 8px 14px; text-align: right; min-width: 190px; }
+  #hud-money { font-size: 26px; font-weight: 900; color: #7dff9a; line-height: 1; }
+  #hud-rank { font-size: 12px; font-weight: 800; color: #ffd76e; margin-top: 4px; letter-spacing: 1px; }
+  #hud-rpbar { height: 7px; background: #2a2438; border-radius: 4px; margin-top: 5px; overflow: hidden; }
+  #hud-rpfill { height: 100%; background: linear-gradient(90deg, #ff9a52, #ffd76e); width: 85%; }
+  #hud-rp { font-size: 11px; color: #cfc8de; margin-top: 3px; }
+  #hud-vitals { display: flex; gap: 10px; margin-top: 6px; font-size: 11px; font-weight: 700; }
+  #hud-vitals b { color: #fff; }
+  .vbar { height: 5px; background: #2a2438; border-radius: 3px; margin-top: 2px; overflow: hidden; }
+  .vbar i { display: block; height: 100%; }
+  #hud-hpfill { background: #69d67a; } #hud-armfill { background: #4fc3f7; }
+  /* Air banner: its own centred row BELOW the top bar — never over the money. */
+  #hud-airbanner { position: absolute; top: 108px; left: 50%; transform: translateX(-50%); padding: 6px 18px; background: rgba(120, 20, 20, 0.85); border: 1px solid #ff6b6b; border-radius: 20px; color: #ffe9e9; font-weight: 900; letter-spacing: 2px; font-size: 13px; white-space: nowrap; }
+  /* SBPD panel, left column. */
+  #hud-sbpd { position: absolute; top: 118px; left: 12px; width: 268px; padding: 10px 12px; }
+  #hud-sbpd h3, #hud-crew h3 { margin: 0 0 6px; font-size: 12px; letter-spacing: 2px; color: #ff9a52; }
+  .sbpd-row { display: flex; gap: 8px; font-size: 12px; padding: 3px 0; border-top: 1px solid rgba(255,255,255,0.08); }
+  .sbpd-call { flex: 1; font-weight: 700; } .sbpd-role { color: #ffd76e; font-weight: 700; } .sbpd-dist { color: #b9b3c9; }
+  /* Crew panel, left column below SBPD. */
+  #hud-crew { position: absolute; top: 268px; left: 12px; width: 268px; padding: 10px 12px; }
+  .crew-row { display: grid; grid-template-columns: 10px 1fr auto; gap: 4px 8px; font-size: 12px; padding: 5px 0; border-top: 1px solid rgba(255,255,255,0.08); align-items: center; }
+  .crew-dot { width: 9px; height: 9px; border-radius: 50%; }
+  .crew-name { font-weight: 800; } .crew-role { color: #b9b3c9; font-size: 10px; text-align: right; }
+  .crew-ability { color: #ffd76e; font-weight: 700; grid-column: 2; } .crew-state { color: #69d67a; font-size: 10px; text-align: right; }
+  /* Bottom-left: speedo + car + radio. */
+  #hud-drive { position: absolute; left: 12px; bottom: 12px; padding: 10px 14px; min-width: 250px; }
+  #hud-speed { font-size: 44px; font-weight: 900; line-height: 0.9; color: #fff; }
+  #hud-speed-unit { font-size: 13px; color: #ff9a52; font-weight: 800; }
+  #hud-car { font-size: 13px; font-weight: 800; margin-top: 4px; }
+  #hud-damage { font-size: 11px; color: #cfc8de; margin-top: 2px; }
+  #hud-dmgbar { height: 6px; background: #2a2438; border-radius: 3px; margin-top: 3px; overflow: hidden; }
+  #hud-dmgfill { height: 100%; background: #69d67a; }
+  #hud-radio { margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.12); padding-top: 6px; }
+  #hud-radio-station { color: #ffd76e; font-weight: 800; font-size: 12px; }
+  #hud-radio-song { color: #cfc8de; font-size: 12px; }
+  /* Bottom-right: minimap + district standing. */
+  #hud-map { position: absolute; right: 12px; bottom: 12px; padding: 10px; text-align: center; }
+  #hud-minimap { border-radius: 50%; border: 2px solid rgba(255,215,110,0.6); display: block; }
+  #hud-district { font-weight: 900; letter-spacing: 1px; margin-top: 6px; color: #fff; }
+  #hud-standing-label { font-size: 11px; color: #69d67a; font-weight: 700; }
+  #hud-standing-bar { height: 7px; background: #2a2438; border-radius: 4px; margin-top: 4px; overflow: hidden; }
+  #hud-standing-fill { height: 100%; background: linear-gradient(90deg, #69d67a, #ffd76e); }
+  #hud-gecko { font-size: 11px; color: #ffd76e; font-weight: 700; margin-top: 6px; }
+  /* Dialog, bottom centre. */
+  #hud-dialog { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: 620px; padding: 12px 16px; display: flex; gap: 14px; align-items: center; }
+  #hud-dialog-avatar { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 20px; color: #14121f; flex: none; }
+  #hud-dialog-name { font-weight: 900; color: #ffd76e; letter-spacing: 1px; }
+  #hud-dialog-line { font-size: 14px; line-height: 1.35; margin-top: 3px; color: #f2ede4; }
+  /* Toast / drift / passed banners, centre. */
+  #hud-toast { position: absolute; top: 152px; left: 50%; transform: translateX(-50%); padding: 8px 20px; background: rgba(12,10,26,0.85); border: 1px solid #ffd76e; border-radius: 8px; font-weight: 800; color: #ffd76e; white-space: nowrap; }
+  #hud-drift { position: absolute; left: 300px; bottom: 150px; padding: 6px 14px; color: #ffd76e; font-weight: 900; border-color: #ff9a52; }
+  #hud-passed { position: absolute; top: 15%; left: 50%; transform: translateX(-50%); padding: 18px 34px; text-align: center; background: rgba(20, 40, 16, 0.88); border: 2px solid #69d67a; }
+  #hud-passed-text { font-size: 22px; font-weight: 900; color: #a9f5b5; letter-spacing: 1px; }
+  #hud-passed-sub { font-size: 13px; color: #d9f7dd; margin-top: 6px; }
+  /* Weapon wheel, centre-right. */
+  #hud-wheel { position: absolute; right: 210px; top: 50%; transform: translateY(-50%); width: 240px; padding: 12px; }
+  #hud-wheel h3 { margin: 0 0 8px; font-size: 12px; letter-spacing: 2px; color: #ff9a52; text-align: center; }
+  .wheel-slot { padding: 8px 10px; border-radius: 8px; margin-top: 6px; background: rgba(255,255,255,0.06); }
+  .wheel-slot b { display: block; font-size: 13px; }
+  .wheel-slot span { font-size: 11px; color: #cfc8de; }
+  .wheel-slot.sel { background: rgba(255, 215, 110, 0.22); border: 1px solid #ffd76e; }
+  .wheel-slot.locked { opacity: 0.45; }
+  /* ---- Title screen: bright sunset ---- */
+  #title-screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(180deg, rgba(255,170,80,0.88) 0%, rgba(255,120,90,0.82) 42%, rgba(60,30,90,0.88) 100%); color: #fff; text-align: center; z-index: 5; }
+  #title-screen h1 { font-size: 84px; margin: 0; letter-spacing: 6px; font-weight: 900; text-shadow: 0 6px 30px rgba(0,0,0,0.45); line-height: 0.95; }
+  #title-screen h2 { font-size: 30px; margin: 8px 0 0; letter-spacing: 12px; font-weight: 800; color: #ffe9a8; }
+  #title-tag { margin-top: 10px; font-size: 15px; color: #fff; opacity: 0.95; }
+  .slots { display: flex; gap: 14px; margin-top: 26px; }
+  .slot { width: 240px; padding: 10px 14px; border-radius: 12px; background: rgba(20,12,40,0.72); border: 2px solid rgba(255,255,255,0.35); text-align: left; }
+  .slot.sel { border-color: #ffd76e; box-shadow: 0 0 0 3px rgba(255,215,110,0.45); }
+  .slot b { display: block; font-size: 15px; letter-spacing: 1px; }
+  .slot span { display: block; font-size: 12px; color: #d8d2e8; margin-top: 5px; }
+  .slot i { display: block; font-style: normal; font-size: 11px; font-weight: 800; color: #ffd76e; margin-top: 8px; letter-spacing: 2px; }
+  #title-start { margin-top: 26px; font-size: 18px; font-weight: 900; letter-spacing: 3px; animation: pulse 1.4s infinite; }
+  @keyframes pulse { 50% { opacity: 0.45; } }
+  #title-controls { margin-top: 14px; font-size: 12px; color: #ffe9a8; line-height: 1.7; }
+  /* ---- Pause screen: map + career + checklist + saves on ONE screen ---- */
+  #pause-screen { position: fixed; inset: 0; background: rgba(10, 8, 22, 0.92); color: #f2ede4; z-index: 6; display: flex; flex-direction: column; padding: 14px 26px; box-sizing: border-box; overflow-y: auto; }
+  #pause-screen h1 { margin: 0; font-size: 30px; letter-spacing: 4px; color: #ffd76e; }
+  #pause-sub { color: #b9b3c9; font-size: 13px; margin-top: 2px; }
+  #pause-grid { display: grid; grid-template-columns: 380px 1fr 1fr; gap: 18px; margin-top: 14px; flex: 1; min-height: 0; }
+  .pause-col h2 { font-size: 13px; letter-spacing: 2px; color: #ff9a52; margin: 0 0 8px; }
+  #pause-map { border-radius: 12px; border: 2px solid rgba(255,215,110,0.5); display: block; }
+  .district-row { display: grid; grid-template-columns: 100px 1fr 105px; gap: 8px; align-items: center; font-size: 11px; padding: 2px 0; }
+  .district-bar { height: 7px; background: #2a2438; border-radius: 4px; overflow: hidden; }
+  .district-bar i { display: block; height: 100%; }
+  .stat-row, .check-row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 3px 0; border-top: 1px solid rgba(255,255,255,0.08); }
+  .check-row { display: grid; grid-template-columns: 20px 175px 1fr auto; gap: 8px; align-items: baseline; }
+  .check-row span:nth-child(3) { color: #b9b3c9; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .check-done { color: #69d67a; } .check-now { color: #ffd76e; } .check-todo { color: #6a6378; }
+  #pause-slots { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+  #pause-slots .slot { width: auto; }
+  #pause-foot { margin-top: 12px; font-size: 13px; color: #ffd76e; font-weight: 700; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="Solmar Bay Sunset Run: drive, escape the police, finish missions"></canvas>
+<p id="status" role="status" aria-live="polite"></p>
+
+<div id="hud" style="display:none">
+  <div id="hud-top">
+    <div id="hud-wanted" class="panel"><div id="hud-stars">★★★☆☆</div><div id="hud-wanted-label">WANTED — SBPD</div></div>
+    <div id="hud-mission" class="panel">
+      <div id="hud-mission-name">6. BEACHFRONT DEAL</div>
+      <div id="hud-mission-stage">STAGE 3/3</div>
+      <div id="hud-mission-obj">Meet the buyer on North Beach</div>
+      <div id="hud-mission-next">NEXT ▸ STREET KINGS</div>
+    </div>
+    <div id="hud-cash" class="panel">
+      <div id="hud-money">$18,700</div>
+      <div id="hud-rank">RANK 12 — HUSTLER</div>
+      <div id="hud-rpbar"><div id="hud-rpfill"></div></div>
+      <div id="hud-rp">4,280 / 5,000 RP</div>
+      <div id="hud-vitals">
+        <span><b id="hud-hp">HP 82</b><span class="vbar"><i id="hud-hpfill" style="width:82%"></i></span></span>
+        <span><b id="hud-armour">ARMOUR 64</b><span class="vbar"><i id="hud-armfill" style="width:64%"></i></span></span>
+        <span><b id="hud-rep">REP 91</b></span>
+      </div>
+    </div>
+  </div>
+  <div id="hud-airbanner">🚁 AIR UNIT DEPLOYED — AIR-1 ON STATION</div>
+  <div id="hud-sbpd" class="panel"><h3>🚔 SBPD RESPONSE</h3><div id="hud-sbpd-rows"></div></div>
+  <div id="hud-crew" class="panel"><h3>👥 CREW — SUNSET RUNNERS</h3><div id="hud-crew-rows"></div></div>
+  <div id="hud-drive" class="panel">
+    <div><span id="hud-speed">0</span> <span id="hud-speed-unit">MPH</span></div>
+    <div id="hud-car">VESPUCCI GT — “SUNSET”</div>
+    <div id="hud-damage">DAMAGE 18%</div>
+    <div id="hud-dmgbar"><div id="hud-dmgfill"></div></div>
+    <div id="hud-radio"><div id="hud-radio-station">♪ SOLMAR FM 98.6</div><div id="hud-radio-song">“Neon Coast” — Midnight Palms</div></div>
+  </div>
+  <div id="hud-map" class="panel">
+    <canvas id="hud-minimap" width="168" height="168"></canvas>
+    <div id="hud-district">MARINA</div>
+    <div id="hud-standing-label">RESPECTED — 72%</div>
+    <div id="hud-standing-bar"><div id="hud-standing-fill"></div></div>
+    <div id="hud-gecko">🦎 GOLDEN GECKO 7/12</div>
+  </div>
+  <div id="hud-dialog" class="panel">
+    <div id="hud-dialog-avatar">LM</div>
+    <div><div id="hud-dialog-name">LENA “GHOST” MARLOW</div><div id="hud-dialog-line"></div></div>
+  </div>
+  <div id="hud-toast" class="panel" style="display:none"><span id="hud-toast-text"></span></div>
+  <div id="hud-drift" class="panel" style="display:none"><span id="hud-drift-text"></span></div>
+  <div id="hud-passed" class="panel" style="display:none">
+    <div id="hud-passed-text">MISSION PASSED</div>
+    <div id="hud-passed-sub">+$3,200 &nbsp;·&nbsp; +800 RP &nbsp;·&nbsp; RATING GOLD</div>
+  </div>
+  <div id="hud-wheel" class="panel" style="display:none"><h3>⚔ WEAPON WHEEL — [Q]</h3><div id="hud-wheel-slots"></div></div>
+</div>
+
+<div id="title-screen">
+  <h1>SOLMAR BAY</h1>
+  <h2>SUNSET RUN</h2>
+  <div id="title-tag">A 3D open-world crime story — 8 missions · 5-star police · your crew · one sunset to take the city.</div>
+  <div class="slots" id="title-slots"></div>
+  <div id="title-start">▶ &nbsp;PRESS ENTER TO START&nbsp; ◀</div>
+  <div id="title-controls">W A S D drive &amp; walk &nbsp;·&nbsp; E enter / exit car &nbsp;·&nbsp; SPACE shoot &nbsp;·&nbsp; Q weapon wheel &nbsp;·&nbsp; R radio &nbsp;·&nbsp; F / G / H crew abilities &nbsp;·&nbsp; ESC pause &amp; map</div>
+</div>
+
+<div id="pause-screen" style="display:none">
+  <h1>❚❚ PAUSED — SOLMAR BAY</h1>
+  <div id="pause-sub">MAP · CAREER · MISSIONS · SAVES — press ESC to resume</div>
+  <div id="pause-grid">
+    <div class="pause-col">
+      <h2>🗺 CITY MAP — DISTRICT STANDING</h2>
+      <canvas id="pause-map" width="360" height="360"></canvas>
+      <div id="pause-districts" style="margin-top:8px"></div>
+    </div>
+    <div class="pause-col">
+      <h2>📊 CAREER STATS — JAY VANCE</h2>
+      <div id="pause-stats"></div>
+      <h2 style="margin-top:16px">💾 SAVE SLOTS</h2>
+      <div id="pause-slots"></div>
+    </div>
+    <div class="pause-col">
+      <h2>✅ MISSION CHECKLIST</h2>
+      <div id="pause-missions"></div>
+      <h2 style="margin-top:16px">🎯 CURRENT OBJECTIVE</h2>
+      <div class="panel" style="padding:12px"><b style="color:#ffd76e">6. BEACHFRONT DEAL — STAGE 3/3</b><div style="margin-top:6px;font-size:13px">Meet the buyer on North Beach. The buyer waits by the kiosk. No cops, no noise.</div><div style="margin-top:8px;font-size:12px;color:#b9b3c9">REWARD &nbsp;+$3,200 · +800 RP · RATING GOLD</div></div>
+    </div>
+  </div>
+  <div id="pause-foot">ESC — RESUME &nbsp;·&nbsp; ENTER — CONTINUE &nbsp;·&nbsp; M — MAP &nbsp;·&nbsp; Progress auto-saves after every mission.</div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
